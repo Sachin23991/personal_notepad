@@ -275,7 +275,7 @@ ${JSON.stringify(page.blocks.map(b => ({ id: b.id, type: b.type, content: b.cont
         ...this.chatHistory.slice(-10) 
       ];
 
-      const res = await fetch('http://localhost:3000/api/chat', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
