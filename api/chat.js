@@ -17,7 +17,7 @@ export default async function handler(req, res) {
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://noteflow-ai.vercel.app', // Required by OpenRouter
+        'HTTP-Referer': 'https://personal-notepad-beryl.vercel.app', // Required by OpenRouter
         'X-Title': 'NoteFlow',
       },
       // Pass the frontend request body directly to OpenRouter
