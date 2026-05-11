@@ -452,7 +452,7 @@
 </div>
 
 <!-- Floating AI Button (Bottom Right) -->
-<button type="button" class="ai-fab" id="ai-panel-btn" title="Open AI assistant (Ctrl+Shift+A)">
+<button type="button" class="ai-fab" id="ai-panel-btn" title="Open AI assistant (Ctrl+Shift+A)" onclick="document.getElementById('ai-panel').classList.toggle('hidden');">
   <img src="ChatGPT Image May 11, 2026, 11_56_55 PM.png" alt="AI" class="ai-fab-img">
 </button>
 
@@ -1722,8 +1722,8 @@ const ui = {
     setTimeout(() => {
       const splash = document.getElementById('splash');
       if (splash) splash.classList.add('out');
-      setTimeout(() => { if(splash) splash.remove(); }, 500);
-    }, 1200);
+      setTimeout(() => { if(splash) splash.remove(); }, 300);
+    }, 300);
   },
 
   initSidebar() {

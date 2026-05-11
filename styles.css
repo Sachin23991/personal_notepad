@@ -395,7 +395,7 @@ body.nf-mono-page #editor .block-content,body.nf-mono-page #page-title{font-fami
 
 /* ========== SPLASH ========== */
 #splash{position:fixed;inset:0;background:var(--bg);z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;transition:opacity .4s,visibility .4s}
-#splash.out{opacity:0;visibility:hidden}
+#splash.out{opacity:0;visibility:hidden;pointer-events:none}
 .splash-logo{width:80px;height:80px;border-radius:16px;object-fit:cover;animation:splashPulse 1.5s ease-in-out infinite;box-shadow:var(--shadow-lg)}
 @keyframes splashPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
 .splash-text{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.5px}
@@ -415,9 +415,9 @@ body.nf-mono-page #editor .block-content,body.nf-mono-page #page-title{font-fami
   #sidebar{position:fixed;top:0;left:0;bottom:0;z-index:100;width:var(--sidebar-w)!important;transform:translateX(-100%);transition:transform var(--trans-slow)}
   #sidebar.mobile-open{transform:translateX(0)}
   .sidebar-toggle-float{display:flex;opacity:1;pointer-events:all}
-  .ai-fab{bottom:20px;right:20px;width:52px;height:52px;z-index:99999;pointer-events:all !important}
+  .ai-fab{position:fixed;bottom:20px;right:20px;width:52px;height:52px;z-index:99999;pointer-events:all !important}
   .ai-fab-img{width:32px;height:32px}
-  .ai-panel{bottom:86px;right:16px;left:16px;width:auto;max-width:none;height:calc(100vh - 120px);z-index:99998}
+  .ai-panel{position:fixed;bottom:86px;right:16px;left:16px;width:auto;max-width:none;height:calc(100vh - 120px);z-index:99998}
 }
 
 /* ========== AI PANEL (Chatbox) ========== */
