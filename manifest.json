@@ -1,0 +1,10 @@
+{
+  "name": "NoteFlow - Personal Notepad Workspace",
+  "short_name": "NoteFlow",
+  "description": "A local-first personal notepad workspace that stores data in your browser.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#6C63FF",
+  "icons": []
+}
