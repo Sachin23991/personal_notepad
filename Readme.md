@@ -550,7 +550,7 @@ NOTEFLOW_AI_SYSTEM_PROMPT=You are NoteFlow AI...
 | `-` + `Space` | Convert block to Bullet list |
 | `[]` + `Space` | Convert block to To-do |
 | `>` + `Space` | Convert block to Quote |
-| `` ``` `` + `Enter` | Convert block to Code block |
+| `\`\`\`` + `Enter` | Convert block to Code block |
 
 ---
 

@@ -751,7 +751,8 @@ const keyboardShortcuts = {
       }
       if (e.shiftKey && !e.altKey && key === 'f') {
         const target = e.target;
-        if (target && (target.closest('#findreplace-modal') || this.isEditableTarget(target))) return;
+        if (target && target.closest('#findreplace-modal')) return;
+        if (target && this.isEditableTarget(target)) return;
         e.preventDefault();
         window.NoteFlowEnhancements?.openFindReplace();
         return;
@@ -761,15 +762,14 @@ const keyboardShortcuts = {
         window.NoteFlowEnhancements?.undoPage();
         return;
       }
-      if (e.altKey && (!e.shiftKey && key === 'y' || (e.shiftKey && key === 'z'))) {
+      if (e.altKey && !e.shiftKey && key === 'y') {
         e.preventDefault();
         window.NoteFlowEnhancements?.redoPage();
       }
     });
   },
 
-  handleEditorShortcuts(e, block, el, editorApi) {
-    const content = el.textContent;
+  handleEditorShortcuts(e, block, el, editorApi, content) {
     const raw = content.trim();
 
     // Editor-only slash menu shortcut
@@ -796,7 +796,6 @@ const keyboardShortcuts = {
       if (raw === '>')        { e.preventDefault(); editorApi.convertBlock(block.id, 'quote'); return true; }
       if (raw === '!')        { e.preventDefault(); editorApi.convertBlock(block.id, 'callout'); return true; }
       if (raw === '---')      { e.preventDefault(); editorApi.convertBlock(block.id, 'divider'); return true; }
-      if (raw === '```')      { e.preventDefault(); editorApi.convertBlock(block.id, 'code'); return true; }
     }
 
     // Markdown code block shortcut on Enter
@@ -1183,8 +1182,8 @@ const editor = {
   // --- KEYDOWN HANDLER ---
   handleKeyDown(e, block, el) {
     if (el.closest('td.nf-table-cell')) return;
-    if (keyboardShortcuts.handleEditorShortcuts(e, block, el, this)) return;
     const content = el.textContent;
+    if (keyboardShortcuts.handleEditorShortcuts(e, block, el, this, content)) return;
 
     // Enter: new block
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -2289,7 +2288,7 @@ const app = {
     // Blocks
     editor.renderPage();
     editor.updatePageMeta();
-    if (window.NoteFlowEnhancements?.state) NoteFlowEnhancements.refreshStatusBar();
+    if (window.NoteFlowEnhancements?.state) window.NoteFlowEnhancements.refreshStatusBar?.();
   },
 
   renderTags() {
