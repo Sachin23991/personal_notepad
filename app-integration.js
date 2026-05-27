@@ -137,7 +137,8 @@
       // Bind "Turn into" option
       const turnIntoItem = blockMenu.querySelector('[data-action="type"]');
       if (turnIntoItem) {
-        turnIntoItem.addEventListener('click', () => {
+        turnIntoItem.addEventListener('click', (e) => {
+          e.stopPropagation();
           const blockId = blockMenu.getAttribute('data-block-id');
           if (blockId && global.AIMenu) {
             global.AIMenu.showTurnIntoMenu(
@@ -151,7 +152,8 @@
       // Bind AI improve option
       const aiBlockItem = blockMenu.querySelector('[data-action="ai-block"]');
       if (aiBlockItem) {
-        aiBlockItem.addEventListener('click', () => {
+        aiBlockItem.addEventListener('click', (e) => {
+          e.stopPropagation();
           const blockId = blockMenu.getAttribute('data-block-id');
           if (blockId && global.AIMenu) {
             global.AIMenu.showAIImproveDialog(blockId);
