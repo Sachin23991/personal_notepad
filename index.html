@@ -1519,10 +1519,10 @@ const editor = {
     if (window.NoteFlowEnhancements) NoteFlowEnhancements.pushBeforeChange();
     const block = state.activePage.blocks.find(b => b.id === id);
     if (!block) return;
-    const prevColor = block.properties?.textColor;
+    const prevProps = block.properties ? { ...block.properties } : {};
     block.type = type;
     block.content = '';
-    block.properties = {};
+    block.properties = { ...prevProps };
     if (type === 'todo') block.properties.checked = false;
     if (type === 'callout') block.properties.emoji = '💡';
     if (type === 'code') block.properties.lang = 'javascript';
@@ -1533,7 +1533,6 @@ const editor = {
         ['', '', ''],
       ];
     }
-    if (prevColor) block.properties.textColor = prevColor;
     state.save();
     this.renderPage();
     setTimeout(() => {
@@ -1559,7 +1558,7 @@ const editor = {
     const blockEl = this.container.querySelector(`[data-id="${id}"]`);
     if (blockEl) {
       if (block.properties?.textColor) blockEl.dataset.textColor = block.properties.textColor;
-      else blockEl.removeAttribute('data-text-color');
+      else delete blockEl.dataset.textColor;
     } else {
       this.renderPage();
     }
