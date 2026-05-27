@@ -199,6 +199,20 @@
   <div class="block-menu-item block-menu-ai" data-action="ai-block"><span class="bmi-icon">✨</span>AI improve block…</div>
   <div class="block-menu-item code-only" data-action="format-code"><span class="bmi-icon">⚡</span>Format code</div>
   <div class="block-menu-item code-only" data-action="lang-convert"><span class="bmi-icon">🔁</span>Convert language (AI)…</div>
+  <div class="block-menu-sep"></div>
+  <div class="block-menu-label">Text color</div>
+  <div class="block-menu-colors">
+    <button class="block-color-btn" data-color="default" title="Default" aria-label="Default">Aa</button>
+    <button class="block-color-btn" data-color="gray" title="Gray" aria-label="Gray"></button>
+    <button class="block-color-btn" data-color="brown" title="Brown" aria-label="Brown"></button>
+    <button class="block-color-btn" data-color="red" title="Red" aria-label="Red"></button>
+    <button class="block-color-btn" data-color="orange" title="Orange" aria-label="Orange"></button>
+    <button class="block-color-btn" data-color="yellow" title="Yellow" aria-label="Yellow"></button>
+    <button class="block-color-btn" data-color="green" title="Green" aria-label="Green"></button>
+    <button class="block-color-btn" data-color="blue" title="Blue" aria-label="Blue"></button>
+    <button class="block-color-btn" data-color="purple" title="Purple" aria-label="Purple"></button>
+    <button class="block-color-btn" data-color="pink" title="Pink" aria-label="Pink"></button>
+  </div>
   <div class="block-menu-item" data-action="duplicate"><span class="bmi-icon">📋</span>Duplicate</div>
   <div class="block-menu-item" data-action="copy-link"><span class="bmi-icon">🔗</span>Copy link to block</div>
   <div class="block-menu-item" data-action="move-up"><span class="bmi-icon">⬆️</span>Move up</div>
@@ -513,7 +527,7 @@ let state = {
       this.data = saved;
     } else {
       this.data = {
-        settings: { theme: 'white', sidebarCollapsed: false, focusMode: true, spellcheck: true },
+        settings: { theme: 'white', sidebarCollapsed: false, focusMode: false, spellcheck: true },
         pages: [],
         trash: []
       };
@@ -521,6 +535,7 @@ let state = {
 
     if (!this.data.settings) this.data.settings = {};
     if (!this.data.settings.theme) this.data.settings.theme = 'white';
+    if (typeof this.data.settings.focusMode !== 'boolean') this.data.settings.focusMode = false;
     if (!Array.isArray(this.data.settings.customDictionary)) this.data.settings.customDictionary = [];
     if (!this.data.settings.ai) this.data.settings.ai = { autoFormatCode: true, autoPasteAsCode: false };
     if (!this.data.settings.editor) this.data.settings.editor = { fontScale: 100, lineHeight: 'normal', monoPage: false };
@@ -1057,6 +1072,7 @@ const editor = {
     wrap.className = 'block';
     wrap.dataset.id = block.id;
     wrap.dataset.type = block.type;
+    if (block.properties?.textColor) wrap.dataset.textColor = block.properties.textColor;
     wrap.draggable = true;
 
     // Handle
@@ -1503,20 +1519,21 @@ const editor = {
     if (window.NoteFlowEnhancements) NoteFlowEnhancements.pushBeforeChange();
     const block = state.activePage.blocks.find(b => b.id === id);
     if (!block) return;
+    const prevColor = block.properties?.textColor;
     block.type = type;
     block.content = '';
-    if (type === 'todo') block.properties = { checked: false };
-    if (type === 'callout') block.properties = { emoji: '💡' };
-    if (type === 'code') block.properties = { lang: 'javascript' };
+    block.properties = {};
+    if (type === 'todo') block.properties.checked = false;
+    if (type === 'callout') block.properties.emoji = '💡';
+    if (type === 'code') block.properties.lang = 'javascript';
     if (type === 'table') {
-      block.properties = {
-        data: [
-          ['Column A', 'Column B', 'Column C'],
-          ['', '', ''],
-          ['', '', ''],
-        ],
-      };
+      block.properties.data = [
+        ['Column A', 'Column B', 'Column C'],
+        ['', '', ''],
+        ['', '', ''],
+      ];
     }
+    if (prevColor) block.properties.textColor = prevColor;
     state.save();
     this.renderPage();
     setTimeout(() => {
@@ -1524,6 +1541,29 @@ const editor = {
       const el = wrap?.querySelector('td.nf-table-cell') || wrap?.querySelector('.block-content');
       if (el) el.focus();
     }, 40);
+  },
+
+  applyBlockColor(id, color) {
+    const page = state.activePage;
+    if (!page) return;
+    const block = page.blocks.find(b => b.id === id);
+    if (!block) return;
+    if (window.NoteFlowEnhancements) NoteFlowEnhancements.pushBeforeChange();
+    if (!block.properties) block.properties = {};
+    if (!color || color === 'default') {
+      delete block.properties.textColor;
+    } else {
+      block.properties.textColor = color;
+    }
+    state.save();
+    const blockEl = this.container.querySelector(`[data-id="${id}"]`);
+    if (blockEl) {
+      if (block.properties?.textColor) blockEl.dataset.textColor = block.properties.textColor;
+      else blockEl.removeAttribute('data-text-color');
+    } else {
+      this.renderPage();
+    }
+    this.updateBlockMenuColorSelection(block.properties?.textColor);
   },
 
   syncTableFromDom(block, tableEl) {
@@ -1719,6 +1759,16 @@ const editor = {
   },
 
   // --- BLOCK MENU ---
+  updateBlockMenuColorSelection(color) {
+    const menu = document.getElementById('block-menu');
+    if (!menu) return;
+    const current = color || 'default';
+    menu.querySelectorAll('.block-color-btn').forEach(btn => {
+      const btnColor = btn.dataset.color || 'default';
+      btn.classList.toggle('selected', btnColor === current);
+    });
+  },
+
   openBlockMenu(blockId, anchor) {
     this.blockMenuTargetId = blockId;
     const menu = document.getElementById('block-menu');
@@ -1726,6 +1776,7 @@ const editor = {
     menu.querySelectorAll('.code-only').forEach(el => {
       el.style.display = block && block.type === 'code' ? '' : 'none';
     });
+    this.updateBlockMenuColorSelection(block?.properties?.textColor);
     const rect = anchor.getBoundingClientRect();
     menu.style.left = (rect.right + 4) + 'px';
     menu.style.top = rect.top + 'px';
@@ -1747,7 +1798,7 @@ const editor = {
     this.blockMenuTargetId = null;
   },
 
-  handleBlockMenuAction(action) {
+  handleBlockMenuAction(action, triggerEl) {
     const id = this.blockMenuTargetId;
     if (!id) return;
     const block = state.activePage.blocks.find(b => b.id === id);
@@ -1755,6 +1806,11 @@ const editor = {
     const idx = blocks.findIndex(b => b.id === id);
     switch (action) {
       case 'type': {
+        if (window.AIMenu) {
+          const anchor = triggerEl || document.querySelector('#block-menu [data-action="type"]');
+          window.AIMenu.showTurnIntoMenu(block, anchor);
+          break;
+        }
         const allowed = BLOCK_TYPES.map(t => t.id).join(', ');
         const next = prompt('Turn into one of:\n' + allowed, block.type);
         if (next && BLOCK_TYPES.some(t => t.id === next.trim())) {
@@ -2004,8 +2060,14 @@ const editor = {
 
     // Block menu actions
     document.getElementById('block-menu').addEventListener('click', (e) => {
+      const colorBtn = e.target.closest('.block-color-btn');
+      if (colorBtn) {
+        const color = colorBtn.dataset.color || 'default';
+        this.applyBlockColor(this.blockMenuTargetId, color);
+        return;
+      }
       const item = e.target.closest('.block-menu-item');
-      if (item) this.handleBlockMenuAction(item.dataset.action);
+      if (item) this.handleBlockMenuAction(item.dataset.action, item);
     });
 
     // Inline toolbar
