@@ -102,6 +102,9 @@ body{font-family:var(--font-body);font-size:15px;color:var(--text);background:va
 .page-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--radius);cursor:pointer;font-size:13.5px;font-weight:500;color:var(--text2);transition:all var(--trans);margin-bottom:1px;position:relative}
 .page-item:hover{background:var(--hover);color:var(--text)}
 .page-item.active{background:var(--active);color:var(--accent)}
+.tree-node{padding-left:calc(10px + var(--tree-depth, 0) * 16px)}
+.tree-toggle{width:10px;display:inline-flex;align-items:center;justify-content:center;color:var(--text3);font-size:10px;flex-shrink:0}
+.tree-toggle-empty{opacity:0}
 .page-item-emoji{font-size:15px;flex-shrink:0;width:20px;text-align:center}
 .page-item-info{flex:1;min-width:0}
 .page-item-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
