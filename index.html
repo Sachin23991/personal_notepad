@@ -1519,10 +1519,10 @@ const editor = {
     if (window.NoteFlowEnhancements) NoteFlowEnhancements.pushBeforeChange();
     const block = state.activePage.blocks.find(b => b.id === id);
     if (!block) return;
-    const prevProps = block.properties ? { ...block.properties } : {};
+    const prevColor = block.properties?.textColor;
     block.type = type;
     block.content = '';
-    block.properties = { ...prevProps };
+    block.properties = prevColor ? { textColor: prevColor } : {};
     if (type === 'todo') block.properties.checked = false;
     if (type === 'callout') block.properties.emoji = '💡';
     if (type === 'code') block.properties.lang = 'javascript';

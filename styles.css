@@ -172,7 +172,7 @@ body.nf-mono-page #editor .block-content,body.nf-mono-page #page-title{font-fami
 /* ========== BLOCKS ========== */
 .block{position:relative;display:flex;align-items:flex-start;gap:4px;margin-bottom:2px}
 .block:hover .block-handle{opacity:1}
-.block-handle{position:absolute;right:-28px;left:auto;top:4px;width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:12px;opacity:0;transition:opacity var(--trans);cursor:grab;flex-shrink:0}
+.block-handle{position:absolute;right:-28px;top:4px;width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:12px;opacity:0;transition:opacity var(--trans);cursor:grab;flex-shrink:0}
 .block-handle:hover{background:var(--hover);color:var(--text2)}
 .block-handle:active{cursor:grabbing}
 .block.dragging{opacity:.4}
