@@ -535,12 +535,22 @@ NOTEFLOW_AI_SYSTEM_PROMPT=You are NoteFlow AI...
 
 | Shortcut | Action |
 |----------|--------|
+| `Ctrl+N` / `Cmd+N` | New page |
+| `Ctrl+P` / `Cmd+P` | Open search |
+| `Ctrl+/` / `Cmd+/` | Open command palette |
+| `Ctrl+\` / `Cmd+\` | Toggle sidebar |
+| `Ctrl+Shift+Z` / `Cmd+Shift+Z` | Toggle Zen mode |
+| `Ctrl+Shift+A` / `Cmd+Shift+A` | Toggle AI panel |
+| `Ctrl+Shift+F` / `Cmd+Shift+F` | Find & replace in current page |
 | `Ctrl+Alt+Z` | Undo last change |
 | `Ctrl+Alt+Y` | Redo last undone |
-| `Cmd+P` | Open search |
-| `Shift+Cmd+F` | Find in page |
-| `Cmd+/` | Command palette |
 | `/` (in editor) | Open slash menu |
+| `#` + `Space` | Convert block to Heading 1 |
+| `##` + `Space` | Convert block to Heading 2 |
+| `-` + `Space` | Convert block to Bullet list |
+| `[]` + `Space` | Convert block to To-do |
+| `>` + `Space` | Convert block to Quote |
+| `\`\`\`` + `Enter` | Convert block to Code block |
 
 ---
 

@@ -672,6 +672,143 @@ const BLOCK_TYPES = [
   { id: 'image',    label: 'Image',       icon: '🖼',  desc: 'Upload or paste image',    category: 'media',    shortcut: '' },
 ];
 
+// ==================== SHORTCUTS ====================
+const keyboardShortcuts = {
+  globalBound: false,
+
+  isEditableTarget(target) {
+    if (!target || !(target instanceof HTMLElement)) return false;
+    if (target.isContentEditable) return true;
+    return !!target.closest('input, textarea, select, [contenteditable="true"]');
+  },
+
+  toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    sidebar.classList.toggle('collapsed');
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    const float = document.getElementById('sidebar-float-btn');
+    if (float) float.classList.toggle('show', isCollapsed);
+    state.data.settings.sidebarCollapsed = isCollapsed;
+    state.save();
+    app.showToast(isCollapsed ? 'Sidebar hidden' : 'Sidebar shown');
+  },
+
+  toggleZenMode() {
+    document.body.classList.toggle('zen-mode');
+  },
+
+  toggleAIPanel() {
+    const panel = document.getElementById('ai-panel');
+    if (panel) panel.classList.toggle('hidden');
+  },
+
+  initGlobalShortcuts() {
+    if (this.globalBound) return;
+    this.globalBound = true;
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      const hasPrimary = e.ctrlKey || e.metaKey;
+
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'));
+        const aiPanel = document.getElementById('ai-panel');
+        if (aiPanel && !aiPanel.classList.contains('hidden')) aiPanel.classList.add('hidden');
+        return;
+      }
+
+      if (!hasPrimary) return;
+
+      if (!e.shiftKey && !e.altKey && key === 'n') {
+        e.preventDefault();
+        state.addPage();
+        return;
+      }
+      if (!e.shiftKey && !e.altKey && key === 'p') {
+        e.preventDefault();
+        window.dispatchEvent(new Event('open-search'));
+        return;
+      }
+      if (!e.shiftKey && !e.altKey && e.key === '/') {
+        e.preventDefault();
+        window.dispatchEvent(new Event('open-cmd'));
+        return;
+      }
+      if (!e.shiftKey && !e.altKey && (e.key === '\\' || e.code === 'Backslash')) {
+        e.preventDefault();
+        this.toggleSidebar();
+        return;
+      }
+      if (e.shiftKey && !e.altKey && key === 'z') {
+        e.preventDefault();
+        this.toggleZenMode();
+        return;
+      }
+      if (e.shiftKey && !e.altKey && key === 'a') {
+        e.preventDefault();
+        this.toggleAIPanel();
+        return;
+      }
+      if (e.shiftKey && !e.altKey && key === 'f') {
+        const target = e.target;
+        if (target && target.closest('#findreplace-modal')) return;
+        if (target && this.isEditableTarget(target)) return;
+        e.preventDefault();
+        window.NoteFlowEnhancements?.openFindReplace();
+        return;
+      }
+      if (e.altKey && !e.shiftKey && key === 'z') {
+        e.preventDefault();
+        window.NoteFlowEnhancements?.undoPage();
+        return;
+      }
+      if (e.altKey && !e.shiftKey && key === 'y') {
+        e.preventDefault();
+        window.NoteFlowEnhancements?.redoPage();
+      }
+    });
+  },
+
+  handleEditorShortcuts(e, block, el, editorApi, content) {
+    const raw = content.trim();
+
+    // Editor-only slash menu shortcut
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === '/' && content === '') {
+      e.preventDefault();
+      editorApi.openSlashMenu(block.id, el);
+      return true;
+    }
+
+    if (e.key === 'Escape') {
+      editorApi.closeSlashMenu();
+      editorApi.closeBlockMenu();
+      return true;
+    }
+
+    // Markdown shortcuts on Space
+    if (e.key === ' ') {
+      if (raw === '#')        { e.preventDefault(); editorApi.convertBlock(block.id, 'h1'); return true; }
+      if (raw === '##')       { e.preventDefault(); editorApi.convertBlock(block.id, 'h2'); return true; }
+      if (raw === '###')      { e.preventDefault(); editorApi.convertBlock(block.id, 'h3'); return true; }
+      if (raw === '-' || raw === '*') { e.preventDefault(); editorApi.convertBlock(block.id, 'bullet'); return true; }
+      if (raw === '1.')       { e.preventDefault(); editorApi.convertBlock(block.id, 'numbered'); return true; }
+      if (raw === '[]' || raw === '[ ]') { e.preventDefault(); editorApi.convertBlock(block.id, 'todo'); return true; }
+      if (raw === '>')        { e.preventDefault(); editorApi.convertBlock(block.id, 'quote'); return true; }
+      if (raw === '!')        { e.preventDefault(); editorApi.convertBlock(block.id, 'callout'); return true; }
+      if (raw === '---')      { e.preventDefault(); editorApi.convertBlock(block.id, 'divider'); return true; }
+    }
+
+    // Markdown code block shortcut on Enter
+    if (e.key === 'Enter' && !e.shiftKey && raw === '```') {
+      e.preventDefault();
+      editorApi.convertBlock(block.id, 'code');
+      return true;
+    }
+
+    return false;
+  },
+};
+
 // ==================== EDITOR ====================
 const editor = {
   container: null,
@@ -1046,35 +1183,7 @@ const editor = {
   handleKeyDown(e, block, el) {
     if (el.closest('td.nf-table-cell')) return;
     const content = el.textContent;
-
-    // Slash menu
-    if (e.key === '/' && content === '') {
-      e.preventDefault();
-      this.openSlashMenu(block.id, el);
-      return;
-    }
-
-    // Close slash menu on Escape
-    if (e.key === 'Escape') {
-      this.closeSlashMenu();
-      this.closeBlockMenu();
-      return;
-    }
-
-    // Markdown shortcuts on Space
-    if (e.key === ' ') {
-      const raw = content.trim();
-      if (raw === '#')        { e.preventDefault(); this.convertBlock(block.id, 'h1'); return; }
-      if (raw === '##')       { e.preventDefault(); this.convertBlock(block.id, 'h2'); return; }
-      if (raw === '###')      { e.preventDefault(); this.convertBlock(block.id, 'h3'); return; }
-      if (raw === '-' || raw === '*') { e.preventDefault(); this.convertBlock(block.id, 'bullet'); return; }
-      if (raw === '1.')       { e.preventDefault(); this.convertBlock(block.id, 'numbered'); return; }
-      if (raw === '[]' || raw === '[ ]') { e.preventDefault(); this.convertBlock(block.id, 'todo'); return; }
-      if (raw === '>')        { e.preventDefault(); this.convertBlock(block.id, 'quote'); return; }
-      if (raw === '!')        { e.preventDefault(); this.convertBlock(block.id, 'callout'); return; }
-      if (raw === '---')      { e.preventDefault(); this.convertBlock(block.id, 'divider'); return; }
-      if (raw === '```')      { e.preventDefault(); this.convertBlock(block.id, 'code'); return; }
-    }
+    if (keyboardShortcuts.handleEditorShortcuts(e, block, el, this, content)) return;
 
     // Enter: new block
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -2110,39 +2219,7 @@ const ui = {
         if (e.target === overlay) overlay.classList.add('hidden');
       });
     });
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'));
-        // Also close AI panel
-        const aiPanel = document.getElementById('ai-panel');
-        if (aiPanel && !aiPanel.classList.contains('hidden')) {
-          aiPanel.classList.add('hidden');
-        }
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
-        e.preventDefault(); state.addPage();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
-        e.preventDefault(); window.dispatchEvent(new Event('open-search'));
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
-        e.preventDefault(); window.dispatchEvent(new Event('open-cmd'));
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
-        e.preventDefault(); document.getElementById('toggle-sidebar').click();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        document.getElementById('sidebar').classList.toggle('collapsed');
-        document.body.classList.toggle('zen-mode');
-      }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
-        e.preventDefault();
-        const panel = document.getElementById('ai-panel');
-        if (panel) panel.classList.toggle('hidden');
-      }
-    });
+    keyboardShortcuts.initGlobalShortcuts();
   },
 
   applyTheme(theme) {
@@ -2211,7 +2288,7 @@ const app = {
     // Blocks
     editor.renderPage();
     editor.updatePageMeta();
-    if (window.NoteFlowEnhancements) NoteFlowEnhancements.refreshStatusBar();
+    if (window.NoteFlowEnhancements?.state) window.NoteFlowEnhancements.refreshStatusBar?.();
   },
 
   renderTags() {

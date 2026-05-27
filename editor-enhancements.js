@@ -39,7 +39,6 @@
       }
       this.initFindReplace();
       this.initStatusBar();
-      this.bindShortcuts();
       this.applyEditorChrome();
       this.bindSettingsEditor();
     },
@@ -307,23 +306,7 @@
     },
 
     bindShortcuts() {
-      global.addEventListener('keydown', (e) => {
-        if (!(e.ctrlKey || e.metaKey)) return;
-        if (e.altKey && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-          e.preventDefault();
-          this.undoPage();
-        }
-        if (e.altKey && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
-          e.preventDefault();
-          this.redoPage();
-        }
-        if (e.shiftKey && e.key.toLowerCase() === 'f') {
-          const t = e.target;
-          if (t && (t.closest('#findreplace-modal') || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-          e.preventDefault();
-          this.openFindReplace();
-        }
-      });
+      // Keyboard bindings are centralized in index.html (keyboardShortcuts).
     },
 
     applyEditorChrome() {

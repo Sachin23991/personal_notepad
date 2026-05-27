@@ -25,9 +25,6 @@
         global.AIMenu.init({ state: this.state, editor: this.editor, app: this.app });
       }
 
-      // Bind undo/redo shortcuts
-      this.bindUndoRedoShortcuts();
-
       // Enhance sidebar toggle with history
       this.enhanceSidebarToggle();
 
@@ -42,18 +39,7 @@
      * Bind Ctrl+Alt+Z (Undo) and Ctrl+Alt+Y (Redo)
      */
     bindUndoRedoShortcuts() {
-      document.addEventListener('keydown', (e) => {
-        // Undo: Ctrl+Alt+Z
-        if ((e.ctrlKey || e.metaKey) && e.altKey && e.key === 'z') {
-          e.preventDefault();
-          this.undoPageChange();
-        }
-        // Redo: Ctrl+Alt+Y
-        if ((e.ctrlKey || e.metaKey) && e.altKey && e.key === 'y') {
-          e.preventDefault();
-          this.redoPageChange();
-        }
-      });
+      // Keyboard bindings are centralized in index.html (keyboardShortcuts).
     },
 
     /**
