@@ -52,6 +52,9 @@
       <button class="sidebar-nav-btn" id="new-page-btn">
         <span class="nav-icon">➕</span><span class="nav-label">New Page</span>
       </button>
+      <button class="sidebar-nav-btn" id="new-folder-btn">
+        <span class="nav-icon">📁</span><span class="nav-label">New Folder</span>
+      </button>
       <button class="sidebar-nav-btn" id="export-pdf-btn">
         <span class="nav-icon">📄</span><span class="nav-label">Export PDF</span>
       </button>
@@ -515,12 +518,15 @@ let state = {
         trash: []
       };
     }
+
     if (!this.data.settings) this.data.settings = {};
     if (!this.data.settings.theme) this.data.settings.theme = 'white';
     if (!Array.isArray(this.data.settings.customDictionary)) this.data.settings.customDictionary = [];
     if (!this.data.settings.ai) this.data.settings.ai = { autoFormatCode: true, autoPasteAsCode: false };
     if (!this.data.settings.editor) this.data.settings.editor = { fontScale: 100, lineHeight: 'normal', monoPage: false };
+    if (!this.data.settings.collapsedFolders) this.data.settings.collapsedFolders = {};
     if (!this.data.historyStacks) this.data.historyStacks = {};
+
     const ai = this.data.settings.ai;
     if (!ai.openrouterApiKey && typeof localStorage !== 'undefined') {
       const k = localStorage.getItem('noteflow_openrouter_key');
@@ -534,17 +540,149 @@ let state = {
       const p = localStorage.getItem('noteflow_ai_system');
       if (p) ai.systemPrompt = p;
     }
-    if (!this.data.trash) this.data.trash = [];
-    if (this.data.pages.length === 0) this.createWelcomePage();
-    this.activePage = this.getPage(this.data.settings.lastPageId) || this.data.pages[0];
+
+    if (!Array.isArray(this.data.pages)) this.data.pages = [];
+    if (!Array.isArray(this.data.trash)) this.data.trash = [];
+
+    const hasTypedNodes = this.data.pages.some(n => n && (n.type === 'folder' || n.type === 'page'));
+    if (!hasTypedNodes && this.data.pages.length) {
+      this.data.pages = [{
+        id: uuid(),
+        type: 'folder',
+        title: 'My Notes',
+        children: this.data.pages.map(p => this.normalizePageNode(p)),
+        createdAt: Date.now(),
+        lastModified: Date.now()
+      }];
+    } else {
+      this.data.pages = this.normalizeNodes(this.data.pages);
+    }
+    this.data.trash = this.normalizeNodes(this.data.trash);
+
+    if (this.getAllPages().length === 0) this.createWelcomePage();
+    this.activePage = this.getPage(this.data.settings.lastPageId) || this.getAllPages()[0] || null;
   },
 
-  getPage(id) { return this.data.pages.find(p => p.id === id) || null; },
+  normalizeNodes(nodes) {
+    if (!Array.isArray(nodes)) return [];
+    return nodes.map(n => this.normalizeNode(n)).filter(Boolean);
+  },
+
+  normalizeNode(node) {
+    if (!node || typeof node !== 'object') return null;
+    if (node.type === 'folder' || Array.isArray(node.children)) {
+      return {
+        id: node.id || uuid(),
+        type: 'folder',
+        title: typeof node.title === 'string' ? node.title : 'Untitled Folder',
+        children: this.normalizeNodes(node.children || []),
+        createdAt: node.createdAt || Date.now(),
+        lastModified: node.lastModified || node.createdAt || Date.now()
+      };
+    }
+    return this.normalizePageNode(node);
+  },
+
+  normalizePageNode(node) {
+    const blocks = Array.isArray(node.blocks) && node.blocks.length ? node.blocks : [{ id: uuid(), type: 'text', content: '' }];
+    return {
+      id: node.id || uuid(),
+      type: 'page',
+      title: typeof node.title === 'string' ? node.title : '',
+      emoji: node.emoji || '📄',
+      tags: Array.isArray(node.tags) ? node.tags : [],
+      cover: node.cover || null,
+      pinned: !!node.pinned,
+      blocks,
+      createdAt: node.createdAt || Date.now(),
+      lastModified: node.lastModified || node.createdAt || Date.now(),
+      order: typeof node.order === 'number' ? node.order : 0
+    };
+  },
+
+  findNode(id, nodes = this.data.pages, parent = null) {
+    if (!id || !Array.isArray(nodes)) return null;
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      if (node.id === id) return { node, nodes, index: i, parent };
+      if (node.type === 'folder') {
+        const found = this.findNode(id, node.children, node);
+        if (found) return found;
+      }
+    }
+    return null;
+  },
+
+  getPage(id) {
+    const found = this.findNode(id);
+    return found && found.node.type === 'page' ? found.node : null;
+  },
+
+  getFolder(id) {
+    if (!id) return null;
+    const found = this.findNode(id);
+    return found && found.node.type === 'folder' ? found.node : null;
+  },
+
+  getAllPages(nodes = this.data.pages, acc = []) {
+    nodes.forEach(node => {
+      if (node.type === 'page') acc.push(node);
+      else if (node.type === 'folder') this.getAllPages(node.children, acc);
+    });
+    return acc;
+  },
+
+  getAllFolders(nodes = this.data.pages, path = [], acc = [{ id: null, title: 'Root', path: 'Root' }]) {
+    nodes.forEach(node => {
+      if (node.type === 'folder') {
+        const nextPath = [...path, node.title || 'Untitled Folder'];
+        acc.push({ id: node.id, title: node.title || 'Untitled Folder', path: nextPath.join(' / ') });
+        this.getAllFolders(node.children, nextPath, acc);
+      }
+    });
+    return acc;
+  },
+
+  getPageFolderPath(pageId) {
+    const path = [];
+    const walk = (nodes, folders) => {
+      for (const node of nodes) {
+        if (node.type === 'page' && node.id === pageId) {
+          path.push(...folders);
+          return true;
+        }
+        if (node.type === 'folder' && walk(node.children, [...folders, node])) return true;
+      }
+      return false;
+    };
+    walk(this.data.pages, []);
+    return path;
+  },
+
+  isDescendantFolder(folderId, possibleParentId) {
+    if (!folderId || !possibleParentId) return false;
+    const folder = this.getFolder(folderId);
+    if (!folder) return false;
+    const stack = [...folder.children];
+    while (stack.length) {
+      const node = stack.pop();
+      if (node.id === possibleParentId) return true;
+      if (node.type === 'folder') stack.push(...node.children);
+    }
+    return false;
+  },
+
+  getDefaultPage() {
+    return {
+      id: uuid(), title: '', type: 'page', emoji: '📄', tags: [], cover: null, pinned: false,
+      blocks: [{ id: uuid(), type: 'text', content: '' }],
+      createdAt: Date.now(), lastModified: Date.now(), order: this.getAllPages().length
+    };
+  },
 
   createWelcomePage() {
-    const id = uuid();
-    this.data.pages.push({
-      id, title: 'Welcome to NoteFlow ✨',
+    const page = {
+      id: uuid(), type: 'page', title: 'Welcome to NoteFlow ✨',
       emoji: '✨', tags: ['Welcome', 'Guide'],
       cover: null, pinned: true,
       blocks: [
@@ -567,7 +705,8 @@ let state = {
         { id: uuid(), type: 'code', content: '// All your data is stored locally — no server, no account\nconsole.log("Welcome to NoteFlow!");', properties: { lang: 'javascript' } }
       ],
       createdAt: Date.now(), lastModified: Date.now(), order: 0
-    });
+    };
+    this.data.pages.unshift(page);
     this.save();
   },
 
@@ -581,55 +720,122 @@ let state = {
     app.renderSidebar();
   },
 
-  addPage() {
-    const id = uuid();
-    const p = {
-      id, title: '', emoji: '📄', tags: [], cover: null, pinned: false,
-      blocks: [{ id: uuid(), type: 'text', content: '' }],
-      createdAt: Date.now(), lastModified: Date.now(), order: this.data.pages.length
-    };
-    this.data.pages.unshift(p);
-    this.setActivePage(id);
+  addPage(parentFolderId = null) {
+    const page = this.getDefaultPage();
+    if (parentFolderId) {
+      const folder = this.getFolder(parentFolderId);
+      if (!folder) return null;
+      folder.children.unshift(page);
+      folder.lastModified = Date.now();
+    } else {
+      this.data.pages.unshift(page);
+    }
+    this.setActivePage(page.id);
     this.save();
-    // Focus title
-    setTimeout(() => { const t = document.getElementById('page-title'); if(t) { t.focus(); placeCursorAtEnd(t); } }, 80);
-    return p;
+    setTimeout(() => { const t = document.getElementById('page-title'); if (t) { t.focus(); placeCursorAtEnd(t); } }, 80);
+    return page;
   },
 
-  deletePage(id) {
-    const idx = this.data.pages.findIndex(p => p.id === id);
-    if (idx === -1) return;
-    const [page] = this.data.pages.splice(idx, 1);
-    page.deletedAt = Date.now();
-    this.data.trash.push(page);
-    if (this.activePage && this.activePage.id === id) {
-      this.activePage = this.data.pages[0] || null;
-      this.data.settings.lastPageId = this.activePage ? this.activePage.id : null;
+  addFolder(parentFolderId = null, title = 'New Folder') {
+    const folder = {
+      id: uuid(),
+      type: 'folder',
+      title: title || 'New Folder',
+      children: [],
+      createdAt: Date.now(),
+      lastModified: Date.now()
+    };
+    if (parentFolderId) {
+      const parent = this.getFolder(parentFolderId);
+      if (!parent) return null;
+      parent.children.unshift(folder);
+      parent.lastModified = Date.now();
+    } else {
+      this.data.pages.unshift(folder);
+    }
+    this.save();
+    app.renderSidebar();
+    return folder;
+  },
+
+  renameNode(id, title) {
+    const found = this.findNode(id);
+    if (!found || !title || !title.trim()) return;
+    found.node.title = title.trim();
+    found.node.lastModified = Date.now();
+    this.save();
+    if (this.activePage && this.activePage.id === id) app.renderPage();
+    app.renderSidebar();
+  },
+
+  moveNode(id, targetFolderId = null) {
+    const found = this.findNode(id);
+    if (!found) return false;
+
+    if (targetFolderId === id) return false;
+    if (found.node.type === 'folder' && this.isDescendantFolder(id, targetFolderId)) return false;
+
+    const [node] = found.nodes.splice(found.index, 1);
+    if (targetFolderId) {
+      const folder = this.getFolder(targetFolderId);
+      if (!folder) {
+        found.nodes.splice(found.index, 0, node);
+        return false;
+      }
+      folder.children.unshift(node);
+      folder.lastModified = Date.now();
+    } else {
+      this.data.pages.unshift(node);
+    }
+    this.save();
+    app.renderSidebar();
+    return true;
+  },
+
+  deleteNode(id) {
+    const found = this.findNode(id);
+    if (!found) return;
+    const [node] = found.nodes.splice(found.index, 1);
+    node.deletedAt = Date.now();
+    this.data.trash.unshift(node);
+
+    if (this.activePage) {
+      const stillExists = this.getPage(this.activePage.id);
+      if (!stillExists) {
+        this.activePage = this.getAllPages()[0] || null;
+        this.data.settings.lastPageId = this.activePage ? this.activePage.id : null;
+      }
     }
     this.save();
     app.renderPage();
     app.renderSidebar();
   },
 
-  restorePage(id) {
-    const idx = this.data.trash.findIndex(p => p.id === id);
+  restoreNode(id, targetFolderId = null) {
+    const idx = this.data.trash.findIndex(n => n.id === id);
     if (idx === -1) return;
-    const [page] = this.data.trash.splice(idx, 1);
-    delete page.deletedAt;
-    this.data.pages.unshift(page);
+    const [node] = this.data.trash.splice(idx, 1);
+    delete node.deletedAt;
+    if (targetFolderId) {
+      const folder = this.getFolder(targetFolderId);
+      if (folder) folder.children.unshift(node);
+      else this.data.pages.unshift(node);
+    } else {
+      this.data.pages.unshift(node);
+    }
     this.save();
     app.renderSidebar();
   },
 
-  purgePage(id) {
-    this.data.trash = this.data.trash.filter(p => p.id !== id);
+  purgeNode(id) {
+    this.data.trash = this.data.trash.filter(n => n.id !== id);
     this.save();
     app.renderSidebar();
   },
 
   togglePin(id) {
     const p = this.getPage(id);
-    if (p) { p.pinned = !p.pinned; this.save(); app.renderSidebar(); }
+    if (p) { p.pinned = !p.pinned; p.lastModified = Date.now(); this.save(); app.renderSidebar(); }
   },
 
   duplicatePage(id) {
@@ -637,10 +843,15 @@ let state = {
     if (!src) return;
     const copy = JSON.parse(JSON.stringify(src));
     copy.id = uuid();
+    copy.type = 'page';
     copy.title = (src.title || 'Untitled') + ' (Copy)';
     copy.blocks = copy.blocks.map(b => ({ ...b, id: uuid() }));
     copy.createdAt = copy.lastModified = Date.now();
-    this.data.pages.unshift(copy);
+
+    const found = this.findNode(id);
+    if (found && found.parent && found.parent.type === 'folder') found.parent.children.unshift(copy);
+    else this.data.pages.unshift(copy);
+
     this.save();
     app.renderSidebar();
   },
@@ -1854,8 +2065,13 @@ const ui = {
       float.classList.toggle('show', sidebar.classList.contains('collapsed'));
     });
 
-    // New page
+    // New page / folder
     document.getElementById('new-page-btn').addEventListener('click', () => state.addPage());
+    document.getElementById('new-folder-btn')?.addEventListener('click', () => {
+      const name = prompt('Folder name:', 'New Folder');
+      if (name === null) return;
+      state.addFolder(null, (name || 'New Folder').trim() || 'New Folder');
+    });
 
     document.getElementById('find-in-page-btn')?.addEventListener('click', () => {
       if (window.NoteFlowEnhancements) NoteFlowEnhancements.openFindReplace();
@@ -2003,7 +2219,7 @@ const ui = {
       selectedIdx = -1;
       if (!q) { results.innerHTML = ''; return; }
       const matches = [];
-      state.data.pages.forEach(page => {
+      state.getAllPages().forEach(page => {
         if (page.title.toLowerCase().includes(q)) matches.push({ page, text: page.title, type: 'title' });
         page.blocks.forEach(block => {
           let txt = '';
@@ -2176,6 +2392,11 @@ const ui = {
       { icon:'✨', label:'AI panel', desc:'Rewrite page with OpenRouter', action: () => document.getElementById('ai-panel')?.classList.remove('hidden') },
       { icon:'🔎', label:'Find in page', desc:'Replace text on this page', action: () => window.NoteFlowEnhancements?.openFindReplace() },
       { icon:'📄', label:'New Page', desc:'Create a blank page', action: () => state.addPage() },
+      { icon:'📁', label:'New Folder', desc:'Create a folder at root', action: () => {
+        const name = prompt('Folder name:', 'New Folder');
+        if (name === null) return;
+        state.addFolder(null, (name || 'New Folder').trim() || 'New Folder');
+      } },
       { icon:'🔍', label:'Search', desc:'Find pages and content', action: () => window.dispatchEvent(new Event('open-search')) },
       { icon:'📝', label:'Export plain text', desc:'Current page as .txt', action: () => window.NoteFlowEnhancements?.exportPagePlainText() },
       { icon:'🎨', label:'Theme: White', desc:'Clean white appearance', action: () => { this.applyTheme('white'); this.updateThemeIcon(); } },
@@ -2261,7 +2482,14 @@ const app = {
     document.getElementById('page-emoji').textContent = page ? (page.emoji || '📄') : '📄';
 
     // Breadcrumb
-    document.getElementById('breadcrumb-cur').textContent = page ? (page.title || 'Untitled') : 'No Page';
+    if (page) {
+      const folderPath = state.getPageFolderPath(page.id).map(f => f.title || 'Untitled Folder');
+      document.getElementById('breadcrumb-home').textContent = folderPath.length ? `NoteFlow / ${folderPath.join(' / ')}` : 'NoteFlow';
+      document.getElementById('breadcrumb-cur').textContent = page.title || 'Untitled';
+    } else {
+      document.getElementById('breadcrumb-home').textContent = 'NoteFlow';
+      document.getElementById('breadcrumb-cur').textContent = 'No Page';
+    }
 
     // Cover
     const coverWrap = document.getElementById('page-cover-wrap');
@@ -2319,63 +2547,136 @@ const app = {
     allList.innerHTML = '';
     trashList.innerHTML = '';
 
-    const favPages = state.data.pages.filter(p => p.pinned);
-    const allPages = state.data.pages.filter(p => !p.pinned);
-    const trashPages = state.data.trash;
+    const collapsedFolders = state.data.settings.collapsedFolders || {};
+    const favPages = state.getAllPages().filter(p => p.pinned);
 
-    const renderItem = (page, container, isTrash = false) => {
+    const renderNode = (node, container, depth = 0, isTrash = false) => {
       const item = document.createElement('div');
-      item.className = 'page-item' + (state.activePage && state.activePage.id === page.id ? ' active' : '');
-      const title = (page.title || 'Untitled').substring(0, 30);
+      const isPage = node.type === 'page';
+      const isFolder = node.type === 'folder';
+      item.className = 'page-item tree-node' + (isPage && state.activePage && state.activePage.id === node.id ? ' active' : '');
+      item.style.setProperty('--tree-depth', depth);
+
+      const icon = isFolder ? '📁' : (node.emoji || '📄');
+      const title = (node.title || (isFolder ? 'Untitled Folder' : 'Untitled')).substring(0, 40);
+      const date = fmtDate(node.lastModified || node.createdAt || Date.now());
+      const isCollapsed = isFolder && !!collapsedFolders[node.id];
+      const disclosure = isFolder ? `<span class="tree-toggle">${isCollapsed ? '▸' : '▾'}</span>` : '<span class="tree-toggle tree-toggle-empty"></span>';
+
       item.innerHTML = `
-        <div class="page-item-emoji">${page.emoji || '📄'}</div>
+        ${disclosure}
+        <div class="page-item-emoji">${icon}</div>
         <div class="page-item-info">
           <div class="page-item-title">${title}</div>
-          <div class="page-item-date">${fmtDate(page.lastModified || page.createdAt)}</div>
+          <div class="page-item-date">${date}</div>
         </div>
         <div class="page-item-actions">
-          ${!isTrash ? `
-            <span class="page-action-btn" title="${page.pinned ? 'Unpin' : 'Pin'}" data-action="pin">${page.pinned ? '★' : '☆'}</span>
-            <span class="page-action-btn" title="Duplicate" data-action="dup">⎘</span>
+          ${!isTrash ? (isFolder ? `
+            <span class="page-action-btn" title="New Page" data-action="add-page">＋</span>
+            <span class="page-action-btn" title="New Folder" data-action="add-folder">📁</span>
+            <span class="page-action-btn" title="Rename" data-action="rename">✎</span>
+            <span class="page-action-btn" title="Move" data-action="move">↪</span>
             <span class="page-action-btn" title="Delete" data-action="del">🗑</span>
           ` : `
+            <span class="page-action-btn" title="${node.pinned ? 'Unpin' : 'Pin'}" data-action="pin">${node.pinned ? '★' : '☆'}</span>
+            <span class="page-action-btn" title="Duplicate" data-action="dup">⎘</span>
+            <span class="page-action-btn" title="Rename" data-action="rename">✎</span>
+            <span class="page-action-btn" title="Move" data-action="move">↪</span>
+            <span class="page-action-btn" title="Delete" data-action="del">🗑</span>
+          `) : `
             <span class="page-action-btn" title="Restore" data-action="restore">↩</span>
             <span class="page-action-btn" title="Delete forever" data-action="purge">✕</span>
           `}
         </div>`;
+      if (isFolder) {
+        item.setAttribute('role', 'button');
+        item.setAttribute('aria-expanded', String(!isCollapsed));
+        item.setAttribute('aria-label', `${isCollapsed ? 'Expand' : 'Collapse'} folder ${title}`);
+      } else {
+        item.setAttribute('role', 'button');
+        item.setAttribute('aria-label', `Open page ${title}`);
+      }
 
       item.addEventListener('click', (e) => {
         const action = e.target.closest('[data-action]')?.dataset.action;
         if (action) {
           e.stopPropagation();
-          if (action === 'pin') state.togglePin(page.id);
-          else if (action === 'dup') { state.duplicatePage(page.id); this.showToast('Page duplicated'); }
-          else if (action === 'del') this.showConfirmDelete(page);
-          else if (action === 'restore') { state.restorePage(page.id); this.showToast('Page restored'); }
-          else if (action === 'purge') this.showConfirmPurge(page);
+          if (action === 'pin') state.togglePin(node.id);
+          else if (action === 'dup') { state.duplicatePage(node.id); this.showToast('Page duplicated'); }
+          else if (action === 'rename') {
+            const next = prompt('Rename', node.title || '');
+            if (next !== null) {
+              const fallback = node.type === 'folder' ? 'Untitled Folder' : 'Untitled';
+              state.renameNode(node.id, (next || '').trim() || fallback);
+            }
+          }
+          else if (action === 'move') this.promptMoveNode(node);
+          else if (action === 'add-page') state.addPage(node.id);
+          else if (action === 'add-folder') {
+            const name = prompt('Folder name:', 'New Folder');
+            if (name === null) return;
+            state.addFolder(node.id, (name || 'New Folder').trim() || 'New Folder');
+          }
+          else if (action === 'del') this.showConfirmDelete(node);
+          else if (action === 'restore') { state.restoreNode(node.id); this.showToast('Item restored'); }
+          else if (action === 'purge') this.showConfirmPurge(node);
           return;
         }
-        if (!isTrash) state.setActivePage(page.id);
+
+        if (isFolder && !isTrash) {
+          collapsedFolders[node.id] = !collapsedFolders[node.id];
+          state.data.settings.collapsedFolders = collapsedFolders;
+          state.save();
+          this.renderSidebar();
+          return;
+        }
+        if (isPage && !isTrash) state.setActivePage(node.id);
       });
 
       container.appendChild(item);
+
+      if (isFolder && !isTrash && !collapsedFolders[node.id]) {
+        node.children.forEach(child => renderNode(child, container, depth + 1, false));
+      }
     };
 
     if (favPages.length === 0) favList.innerHTML = '<div class="empty-section">No favorites</div>';
-    else favPages.forEach(p => renderItem(p, favList));
+    else favPages.forEach(p => renderNode(p, favList, 0, false));
 
-    if (allPages.length === 0) allList.innerHTML = '<div class="empty-section">No pages</div>';
-    else allPages.forEach(p => renderItem(p, allList));
+    if (state.data.pages.length === 0) allList.innerHTML = '<div class="empty-section">No pages or folders</div>';
+    else state.data.pages.forEach(n => renderNode(n, allList, 0, false));
 
-    if (trashPages.length === 0) trashList.innerHTML = '<div class="empty-section">Trash is empty</div>';
-    else trashPages.forEach(p => renderItem(p, trashList, true));
+    if (state.data.trash.length === 0) trashList.innerHTML = '<div class="empty-section">Trash is empty</div>';
+    else state.data.trash.forEach(n => renderNode(n, trashList, 0, true));
   },
 
-  showConfirmDelete(page) {
-    ui.showConfirm('Move to Trash', `Move "${page.title || 'Untitled'}" to trash?`, () => state.deletePage(page.id));
+  promptMoveNode(node) {
+    const folders = state.getAllFolders();
+    const filtered = folders.filter(f => {
+      if (node.type !== 'folder') return true;
+      if (!f.id) return true;
+      if (f.id === node.id) return false;
+      return !state.isDescendantFolder(node.id, f.id);
+    });
+    const options = filtered.map((f, i) => `${i + 1}. ${f.path}`).join('\n');
+    const raw = prompt(`Move to folder (enter number):\n${options}`, '1');
+    if (raw === null) return;
+    const idx = Number(raw.trim());
+    if (!Number.isInteger(idx) || idx < 1 || idx > filtered.length) {
+      this.showToast('Invalid folder selection');
+      return;
+    }
+    const ok = state.moveNode(node.id, filtered[idx - 1].id || null);
+    if (!ok) this.showToast('Invalid move target');
   },
-  showConfirmPurge(page) {
-    ui.showConfirm('Delete Forever', `Permanently delete "${page.title || 'Untitled'}"? This cannot be undone.`, () => state.purgePage(page.id));
+
+  showConfirmDelete(node) {
+    const kind = node.type === 'folder' ? 'folder' : 'page';
+    ui.showConfirm('Move to Trash', `Move ${kind} "${node.title || (kind === 'folder' ? 'Untitled Folder' : 'Untitled')}" to trash?`, () => state.deleteNode(node.id));
+  },
+  showConfirmPurge(node) {
+    const kind = node.type === 'folder' ? 'folder' : 'page';
+    ui.showConfirm('Delete Forever', `Permanently delete ${kind} "${node.title || (kind === 'folder' ? 'Untitled Folder' : 'Untitled')}"? This cannot be undone.`, () => state.purgeNode(node.id));
   },
 
   renderDictList() {
